@@ -3,7 +3,7 @@
 	ModuleToProcess = 'AdvancedLog.psm1'
 	
 	# Version number of this module.
-	ModuleVersion = '1.4.1'
+	ModuleVersion = '1.4.2'
 	
 	# ID used to uniquely identify this module
 	GUID = '04e4e1cf-1edd-4d8d-9ef1-8bd3bc7c210d'
