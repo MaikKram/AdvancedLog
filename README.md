@@ -7,7 +7,7 @@ Simple and easy to use module for adding advanced logging features to powershell
 
 #### Standard-Messages
 `Write-Log –Message "Standard-Messages" –Type Info`
-![https://github.com/MaikKram/AdvancedLog/blob/dev/gfx/sample1.png](Example)
+![https://github.com/MaikKram/AdvancedLog/blob/dev/gfx/sample1.png]
 
 #### Warning-Messages
 `Write-Log –Message "Warning-Messages" –Type Warning`
