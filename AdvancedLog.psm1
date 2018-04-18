@@ -52,8 +52,8 @@ function Write-Log {
 [CmdletBinding(DefaultParametersetName='None')]
     Param 
     (
-        [Parameter(Position=0, ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)][Alias('Name')][String] $Message,
-        [ValidateSet(“Info”,”Warning”,”Error”)][String] $Type = "Info",
+        [Parameter(Position=0, ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)][Alias('Name')][object] $Message,
+        [ValidateSet(“Info”,”Warning”,”Error”,"Verbose")][String] $Type = "Info",
         [String]$LogFile = [String]::Empty,
         [Switch]$NoNewline = $false,
         [Switch]$FillLine,
@@ -61,12 +61,17 @@ function Write-Log {
         [Parameter(ParameterSetName='EventLog',Mandatory=$false)][Switch]$WriteEventLog,
         [Parameter(ParameterSetName='EventLog',Mandatory=$true)][string]$EventLogName,
         [Parameter(ParameterSetName='EventLog',Mandatory=$true)][string]$EventLogSource,
-        [Switch]$Live
+        [Switch]$Live,
+        [Switch]$PassThru
     )
 
     begin {
+       [System.ConsoleColor] $_color   = [console]::ForegroundColor
+
         if (-not $Live) {
             [System.Text.StringBuilder] $_fullString = New-Object System.Text.StringBuilder
+            #fix:prevent empty line at end
+            $NoNewline = $true
         }
         # Try open Logfile
         try {
@@ -77,7 +82,7 @@ function Write-Log {
                 $LogStreamWriter.AutoFlush = $true
             } 
         } catch {
-            Throw "Could create Logfile. $($_.Exception.Message)"
+            Throw "Couldn't create Logfile. $($_.Exception.Message)"
         }
         # Try create EventLog
         try {
@@ -86,14 +91,10 @@ function Write-Log {
             }
         }
         catch {
-            Throw "Could create Eventlog. $($_.Exception.Message)"
+            Throw "Couldn't create Eventlog. $($_.Exception.Message)"
         }
-    }
 
-    process {
-        if ($Message -eq $null) { return }
-	
-	    # filter for colored text output
+        # filter for colored text output
         filter ColorPatternTag([ConsoleColor]$Color = "White") 
         {
             $split = $_ -split "(<.*?\>.*?\</.*?\>)"
@@ -111,11 +112,35 @@ function Write-Log {
             
             Write-Host -NoNewline:$NoNewline
         }
+    }
+
+    process {
+        [System.ConsoleColor] $_color   = [console]::ForegroundColor
+        if ($Message -eq $null) { return }
+
+        #check if we have direct pipe messages and switch type of the message accordingly
+        switch ($Message.GetType().name) {
+            "VerboseRecord" {
+                $Type = "Verbose"
+                break
+            }
+            "ErrorRecord" {
+                $Type = "Error"
+                break
+            }
+            "WarningRecord" {
+                $Type = "Warning"
+                break
+            }
+            default {
+                $Type = "Info"
+                break
+            }
+        }
 
     	# define an empty stringbuilder
         [System.Text.StringBuilder] $_string = New-Object System.Text.StringBuilder
         [System.Text.StringBuilder] $_type   = New-Object System.Text.StringBuilder
-        [System.ConsoleColor] $_color   = [console]::ForegroundColor
         [System.Text.StringBuilder] $_indent = New-Object System.Text.StringBuilder
 
         # fill the indent with spaces
@@ -123,7 +148,7 @@ function Write-Log {
 
         # add date and time 
         $null = $_string.Append([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss.ffff"))
-        
+
         switch($Type) {
             "Info" {	
 		        $_type = "INFO"
@@ -140,6 +165,12 @@ function Write-Log {
                 $_type = "ERROR"
                 $_eventID = 2
 		        $_color = [System.ConsoleColor]::Red
+                break
+            }
+            "Verbose" {
+                $_type = "VERB"
+                $_eventID = 1
+		        $_color = [System.ConsoleColor]::Yellow
                 break
             }
         }
@@ -161,7 +192,8 @@ function Write-Log {
             # eventlog out
             if ($WriteEventLog -and -not [string]::IsNullOrEmpty($Message)) {
                 if ($_string.Length -gt 0) {  
-                    Write-EventLog -LogName $EventLogName -Source $EventLogSource -EntryType $Type -EventId $_eventID -Message $([String]::Format("{0}{1}", $_indent.toString(), "$Message"))
+                    if ($Type = "Verbose") { $_evtLogType = "Info" } else { $_evtLogType = $Type }
+                    Write-EventLog -LogName $EventLogName -Source $EventLogSource -EntryType $_evtLogType -EventId $_eventID -Message $([String]::Format("{0}{1}", $_indent.toString(), "$Message"))
                 }
             }
         } else {
@@ -199,5 +231,60 @@ function Write-Log {
        }
        $_string = $null
        $_fullString = $null
+
+       if ($PassThru) { return $Message }
     }
+}
+
+function AdvancedLog:Enable-StreamMode {
+    # override standard cmdlets (there are still internal c# functions to write a verbose line -> see wget -verbose)
+    function Global:Write-Verbose {
+        [CmdletBinding()]
+        param(
+           [Parameter(Mandatory=$true, Position=0, ValueFromPipeline=$true)]
+           [Alias('Msg')]
+           [AllowEmptyString()]
+           [System.String]
+           ${Message}
+        )
+
+        begin {
+           try {
+               $outBuffer = $null
+               if ($PSBoundParameters.TryGetValue('OutBuffer', [ref]$outBuffer))
+               {
+                   $PSBoundParameters['OutBuffer'] = 1
+               }
+               #remove extra parameters which are not known by the base command
+               #$null = $PSBoundParameters.Remove('WriteLog')
+               $wrappedCmd = $ExecutionContext.InvokeCommand.GetCommand('Write-Verbose', [System.Management.Automation.CommandTypes]::Cmdlet)
+               $scriptCmd = {& $wrappedCmd @PSBoundParameters }
+               $steppablePipeline = $scriptCmd.GetSteppablePipeline($myInvocation.CommandOrigin)
+               $steppablePipeline.Begin($PSCmdlet)
+           } catch {
+               throw
+           }
+        }
+
+        process {
+           try {
+                $VerbosePreference
+               if ( $VerbosePreference ) {
+               Write-Log -Message $Message -Type Verbose -Indent 3 }
+           } catch {
+               throw
+           }
+        }
+
+        end {
+           try {
+               #if (-not $WriteLog) {
+               #$steppablePipeline.End() }
+           } catch {
+               throw
+           }
+        }
+    }
+
+    Write-Log -Type Info "AdvancedLog stream-mode enabled."
 }
