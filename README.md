@@ -20,6 +20,9 @@ Simple and easy to use module for adding advanced logging features to powershell
 #### Pipe-Parameter
 `Ping 127.0.0.1 | Write-Log`
 
+#### Live-Output
+`Ping 127.0.0.1 | Write-Log -Live`
+
 #### Fill-Line
 `Ping 127.0.0.1 | Write-Log -FillLine`
 
@@ -34,3 +37,8 @@ Simple and easy to use module for adding advanced logging features to powershell
 
 ##### or combine anything together
 
+
+## Further features planed
+
+* Streamoutput (direct output from the message-streams)
+* Customizable output and graphical styling with dingbat-font
