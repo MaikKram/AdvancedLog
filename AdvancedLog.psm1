@@ -67,6 +67,7 @@ function Write-Log {
 
     begin {
        [System.ConsoleColor] $_color   = [console]::ForegroundColor
+       [string] $_origin = $PSScriptRoot
 
         if (-not $Live) {
             [System.Text.StringBuilder] $_fullString = New-Object System.Text.StringBuilder
@@ -75,7 +76,7 @@ function Write-Log {
         }
         # Try open Logfile
         try {
-            
+            $LogFile = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($LogFile) #FIX18051702: Fix issues with relative path, now the current working folder is root for the relative path
             if (-not $([string]::IsNullOrEmpty($LogFile)) -and $(Test-Path -Path $([System.IO.Path]::GetDirectoryName($LogFile)))) { 
                 $FS = New-Object System.IO.FileStream($LogFile, [System.IO.FileMode]::Append, [System.IO.FileAccess]::Write, [System.IO.FileShare]::ReadWrite)
                 $LogStreamWriter = New-Object System.IO.StreamWriter($FS)
@@ -97,13 +98,14 @@ function Write-Log {
         # filter for colored text output
         filter ColorPatternTag([ConsoleColor]$Color = "White") 
         {
-            $split = $_ -split "(<.*?\>.*?\</.*?\>)"
+            $split = $_ -split "(<(.*?)\>.*?\</\2\>)"
 
             for( $i = 0; $i -lt $split.Count; ++$i ) 
             {
                 $_find = [System.Text.RegularExpressions.Regex]::Match($split[$i], "\<(?'farbe'.*?)\>(?'text'.*?)\</\k'farbe'\>")
                 if ($_find.Success) {
                     Write-Host  $($_find.Groups['text'].value) -ForegroundColor $($_find.Groups['farbe'].value) -NoNewline
+                    $i++
                 }
                 else {
                     Write-Host $split[$i] -ForegroundColor $Color -NoNewline
@@ -219,7 +221,7 @@ function Write-Log {
             
             # logfile out
             if ($LogStreamWriter -ne $null) {
-                $LogStreamWriter.WriteLine($_fullString.ToString())
+                $LogStreamWriter.Write($_fullString.ToString()) #FIX18051701: Fix empty lines in logfile
             }
        
             # eventlog out
