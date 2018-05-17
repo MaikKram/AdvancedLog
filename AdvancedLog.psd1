@@ -11,11 +11,8 @@
 # Script module or binary module file associated with this manifest.
 RootModule = 'AdvancedLog.psm1'
 
-# Script module or binary module file associated with this manifest
-ModuleToProcess = 'AdvancedLog.psm1'
-
 # Version number of this module.
-ModuleVersion = '1.6'
+ModuleVersion = '1.7'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()

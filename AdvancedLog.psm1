@@ -53,7 +53,7 @@ function Write-Log {
     Param 
     (
         [Parameter(Position=0, ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)][Alias('Name')][object] $Message,
-        [ValidateSet(“Info”,”Warning”,”Error”,"Verbose")][String] $Type = "Info",
+        [ValidateSet(“Info”,”Warning”,”Error”,"Verbose", "Auto")][String] $Type = "Auto",
         [String]$LogFile = [String]::Empty,
         [Switch]$NoNewline = $false,
         [Switch]$FillLine,
@@ -118,26 +118,6 @@ function Write-Log {
         [System.ConsoleColor] $_color   = [console]::ForegroundColor
         if ($Message -eq $null) { return }
 
-        #check if we have direct pipe messages and switch type of the message accordingly
-        switch ($Message.GetType().name) {
-            "VerboseRecord" {
-                $Type = "Verbose"
-                break
-            }
-            "ErrorRecord" {
-                $Type = "Error"
-                break
-            }
-            "WarningRecord" {
-                $Type = "Warning"
-                break
-            }
-            default {
-                $Type = "Info"
-                break
-            }
-        }
-
     	# define an empty stringbuilder
         [System.Text.StringBuilder] $_string = New-Object System.Text.StringBuilder
         [System.Text.StringBuilder] $_type   = New-Object System.Text.StringBuilder
@@ -172,6 +152,34 @@ function Write-Log {
                 $_eventID = 1
 		        $_color = [System.ConsoleColor]::Yellow
                 break
+            }
+            default {
+                #check if we have direct pipe messages and switch type of the message accordingly
+                switch ($Message.GetType().name) {
+                    "VerboseRecord" {
+                        $_type = "VERB"
+                        $_eventID = 1
+		                $_color = [System.ConsoleColor]::Yellow
+                        break
+                    }
+                    "ErrorRecord" {
+                        $_type = "ERROR"
+                        $_eventID = 2
+		                $_color = [System.ConsoleColor]::Red
+                        break
+                    }
+                    "WarningRecord" {
+                        $_type = "WARN"
+                        $_eventID = 1
+        		        $_color = [System.ConsoleColor]::Yellow
+                        break
+                    }
+                    default {
+                        $_type = "INFO"
+                        $_eventID = 0
+                        break
+                    }
+                }
             }
         }
 
@@ -268,7 +276,7 @@ function AdvancedLog:Enable-StreamMode {
 
         process {
            try {
-                $VerbosePreference
+               #$VerbosePreference
                if ( $VerbosePreference ) {
                Write-Log -Message $Message -Type Verbose -Indent 3 }
            } catch {
